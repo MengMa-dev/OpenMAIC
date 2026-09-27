@@ -123,6 +123,8 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
           'default'
         : DEFAULT_TTS_VOICES[selectedProviderId as keyof typeof DEFAULT_TTS_VOICES] || 'default';
   const cloneSpeedDisabled = selectedProviderId === 'qwen-tts' && isQwenCloneVoice(effectiveVoice);
+  const googleSpeedUnsupported = selectedProviderId === 'google-tts';
+  const speedDisabled = cloneSpeedDisabled || googleSpeedUnsupported;
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -228,6 +230,8 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
         return '/text-to-speech';
       case 'doubao-tts':
         return '/unidirectional';
+      case 'google-tts':
+        return '/interactions';
       default:
         return '';
     }
@@ -477,7 +481,7 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
         <div className="flex items-center justify-between">
           <Label className="text-sm">{t('settings.ttsSpeed')}</Label>
           <span className="text-xs text-muted-foreground">
-            {cloneSpeedDisabled ? '1×' : `${ttsSpeed.toFixed(2)}×`}
+            {speedDisabled ? '1×' : `${ttsSpeed.toFixed(2)}×`}
           </span>
         </div>
         <input
@@ -486,13 +490,16 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
           min={ttsProvider?.speedRange?.min ?? 0.5}
           max={ttsProvider?.speedRange?.max ?? 2}
           step={0.05}
-          value={cloneSpeedDisabled ? 1 : ttsSpeed}
-          disabled={cloneSpeedDisabled}
+          value={speedDisabled ? 1 : ttsSpeed}
+          disabled={speedDisabled}
           onChange={(event) => setTTSSpeed(Number(event.target.value))}
           className="w-full disabled:cursor-not-allowed disabled:opacity-50"
         />
         {cloneSpeedDisabled && (
           <p className="text-xs text-muted-foreground">{t('settings.qwenCloneSpeedHint')}</p>
+        )}
+        {googleSpeedUnsupported && (
+          <p className="text-xs text-muted-foreground">{t('settings.googleTtsSpeedUnavailable')}</p>
         )}
       </div>
 

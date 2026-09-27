@@ -18,6 +18,25 @@ function readSampleRate(wav: Uint8Array): number {
   return new DataView(wav.buffer, wav.byteOffset, wav.byteLength).getUint32(24, true);
 }
 
+/** Documented Interactions REST shape (not the SDK `output_audio` convenience field). */
+function restAudioResponse(pcm: Uint8Array, sampleRate = 24_000) {
+  return {
+    status: 'completed',
+    steps: [
+      {
+        type: 'model_output',
+        content: [
+          {
+            type: 'audio',
+            mime_type: `audio/l16;rate=${sampleRate}`,
+            data: Buffer.from(pcm).toString('base64'),
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe('pcmS16leMonoToWav', () => {
   it('wraps PCM with a RIFF/WAVE header at 24 kHz', () => {
     const pcm = fakePcm(16);
@@ -35,12 +54,11 @@ describe('Google Gemini TTS', () => {
     mockFetch.mockReset();
   });
 
-  it('posts to /interactions with speech_config and wraps PCM as wav', async () => {
+  it('reads audio from steps[].content[] and wraps PCM as wav', async () => {
     const pcm = fakePcm(12);
-    const b64 = Buffer.from(pcm).toString('base64');
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ output_audio: { data: b64 } }),
+      json: async () => restAudioResponse(pcm),
       headers: { get: () => null },
     });
 
@@ -76,12 +94,39 @@ describe('Google Gemini TTS', () => {
     expect(Array.from(result.audio.slice(44))).toEqual(Array.from(pcm));
   });
 
+  it('rejects SDK output_audio when the REST steps payload is absent', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ output_audio: { data: Buffer.from(fakePcm()).toString('base64') } }),
+      headers: { get: () => null },
+    });
+
+    await expect(
+      generateTTS({ providerId: 'google-tts', apiKey: 'k', voice: 'Kore' }, 'hi'),
+    ).rejects.toThrow(/missing audio data/);
+  });
+
+  it('uses the rate declared on the audio mime type', async () => {
+    const pcm = fakePcm(8);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => restAudioResponse(pcm, 16_000),
+      headers: { get: () => null },
+    });
+
+    const result = await generateTTS(
+      { providerId: 'google-tts', apiKey: 'k', voice: 'Kore' },
+      'hi',
+    );
+
+    expect(readSampleRate(result.audio)).toBe(16_000);
+    expect(Array.from(result.audio.slice(44))).toEqual(Array.from(pcm));
+  });
+
   it('defaults voice to Kore and model to gemini-3.1-flash-tts-preview', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        outputAudio: { data: Buffer.from(fakePcm()).toString('base64') },
-      }),
+      json: async () => restAudioResponse(fakePcm()),
       headers: { get: () => null },
     });
 
@@ -95,9 +140,7 @@ describe('Google Gemini TTS', () => {
   it('respects a custom baseUrl without swallowing the path', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        output_audio: { data: Buffer.from(fakePcm()).toString('base64') },
-      }),
+      json: async () => restAudioResponse(fakePcm()),
       headers: { get: () => null },
     });
 

@@ -1461,6 +1461,7 @@
     "qwenCloneSaveFailed": "Failed to register the Qwen cloned voice",
     "qwenCloneUnsupported": "Recording is not supported in this browser; upload an audio file instead.",
     "qwenCloneSpeedHint": "Cloned voices always synthesize at 1× speed.",
+    "googleTtsSpeedUnavailable": "Speed adjustment is not available for Google Gemini TTS.",
     "qwenCloneDeleteWarning": "The voice was removed locally, but provider deletion failed.",
     "qwenCloneNarrationUnavailable": "The assigned voice is unavailable. Narration will use another enabled voice instead.",
     "qwenCloneDiscussionUnavailable": "The assigned voice is unavailable. Discussion will use another enabled voice instead.",

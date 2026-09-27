@@ -1188,53 +1188,54 @@ async function generateGoogleTTS(
   }
 
   const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-  const base64 = extractGoogleTtsAudioBase64(payload);
-  if (!base64) {
+  const audio = extractGoogleInteractionsAudio(payload);
+  if (!audio) {
     throw new Error('Google Gemini TTS API error: response missing audio data');
   }
 
-  const pcm = new Uint8Array(Buffer.from(base64, 'base64'));
+  const pcm = new Uint8Array(Buffer.from(audio.data, 'base64'));
   if (pcm.byteLength === 0) {
     throw new Error('Google Gemini TTS API error: empty audio payload');
   }
 
   return {
-    audio: pcmS16leMonoToWav(pcm, 24_000),
+    audio: pcmS16leMonoToWav(pcm, audio.sampleRate),
     format: 'wav',
   };
 }
 
-/** Pull base64 PCM from Interactions JSON (snake_case or camelCase). */
-function extractGoogleTtsAudioBase64(payload: Record<string, unknown> | null): string | null {
-  if (!payload) return null;
+/**
+ * Interactions REST responses put audio on `steps[].content[]`, not on the
+ * SDK convenience field `output_audio`. See speech-generation single-speaker docs.
+ */
+function extractGoogleInteractionsAudio(
+  payload: Record<string, unknown> | null,
+): { data: string; sampleRate: number } | null {
+  if (!payload || !Array.isArray(payload.steps)) return null;
 
-  const fromBlock = (block: unknown): string | null => {
-    if (!block || typeof block !== 'object') return null;
-    const obj = block as Record<string, unknown>;
-    const data = obj.data ?? obj.Data;
-    return typeof data === 'string' && data.length > 0 ? data : null;
-  };
-
-  const direct =
-    fromBlock(payload.output_audio) || fromBlock(payload.outputAudio) || fromBlock(payload.audio);
-  if (direct) return direct;
-
-  const outputs = payload.outputs ?? payload.output;
-  if (Array.isArray(outputs)) {
-    for (const item of outputs) {
-      if (!item || typeof item !== 'object') continue;
-      const obj = item as Record<string, unknown>;
-      const nested =
-        fromBlock(obj.audio) ||
-        fromBlock(obj.output_audio) ||
-        fromBlock(obj.inline_data) ||
-        fromBlock(obj.inlineData);
-      if (nested) return nested;
-      if (typeof obj.data === 'string' && obj.data.length > 0) return obj.data;
+  for (const step of payload.steps) {
+    if (!step || typeof step !== 'object') continue;
+    const content = (step as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (!part || typeof part !== 'object') continue;
+      const block = part as { type?: unknown; data?: unknown; mime_type?: unknown };
+      if (block.type !== 'audio' || typeof block.data !== 'string' || block.data.length === 0) {
+        continue;
+      }
+      return { data: block.data, sampleRate: sampleRateFromL16Mime(block.mime_type) };
     }
   }
 
   return null;
+}
+
+/** `audio/l16;rate=24000` → 24000. Missing or unparseable rate stays at 24 kHz. */
+function sampleRateFromL16Mime(mime: unknown): number {
+  if (typeof mime !== 'string') return 24_000;
+  const match = /(?:^|[;\s])rate=(\d+)/i.exec(mime);
+  const rate = match ? Number(match[1]) : NaN;
+  return Number.isFinite(rate) && rate > 0 ? rate : 24_000;
 }
 
 /**
