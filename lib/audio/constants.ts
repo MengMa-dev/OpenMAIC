@@ -1162,6 +1162,7 @@ export const TTS_PROVIDERS: Record<BuiltInTTSProviderId, TTSProviderConfig> = {
       },
     ],
     supportedFormats: ['wav'],
+    supportsSpeed: false,
   },
 
   'browser-native-tts': {

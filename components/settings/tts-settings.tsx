@@ -56,6 +56,7 @@ import { toast } from 'sonner';
 import { createLogger } from '@/lib/logger';
 import { useTTSPreview } from '@/lib/audio/use-tts-preview';
 import { isCustomTTSProvider } from '@/lib/audio/types';
+import { TTSSpeedField } from './tts-speed-field';
 import {
   getVoxCPMProviderOptions,
   normalizeQwenReferenceAudio,
@@ -123,8 +124,6 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
           'default'
         : DEFAULT_TTS_VOICES[selectedProviderId as keyof typeof DEFAULT_TTS_VOICES] || 'default';
   const cloneSpeedDisabled = selectedProviderId === 'qwen-tts' && isQwenCloneVoice(effectiveVoice);
-  const googleSpeedUnsupported = selectedProviderId === 'google-tts';
-  const speedDisabled = cloneSpeedDisabled || googleSpeedUnsupported;
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -477,31 +476,12 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
           </>
         ))}
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm">{t('settings.ttsSpeed')}</Label>
-          <span className="text-xs text-muted-foreground">
-            {speedDisabled ? '1×' : `${ttsSpeed.toFixed(2)}×`}
-          </span>
-        </div>
-        <input
-          aria-label={t('settings.ttsSpeed')}
-          type="range"
-          min={ttsProvider?.speedRange?.min ?? 0.5}
-          max={ttsProvider?.speedRange?.max ?? 2}
-          step={0.05}
-          value={speedDisabled ? 1 : ttsSpeed}
-          disabled={speedDisabled}
-          onChange={(event) => setTTSSpeed(Number(event.target.value))}
-          className="w-full disabled:cursor-not-allowed disabled:opacity-50"
-        />
-        {cloneSpeedDisabled && (
-          <p className="text-xs text-muted-foreground">{t('settings.qwenCloneSpeedHint')}</p>
-        )}
-        {googleSpeedUnsupported && (
-          <p className="text-xs text-muted-foreground">{t('settings.googleTtsSpeedUnavailable')}</p>
-        )}
-      </div>
+      <TTSSpeedField
+        provider={ttsProvider}
+        speed={ttsSpeed}
+        cloneVoiceLocked={cloneSpeedDisabled}
+        onSpeedChange={setTTSSpeed}
+      />
 
       {/* Test TTS */}
       <div className="space-y-2">

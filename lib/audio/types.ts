@@ -145,6 +145,12 @@ export interface TTSProviderConfig {
     max: number;
     default: number;
   };
+  /**
+   * `false` when the provider ignores the requested speed, which locks the speed
+   * control in settings. Omitted means speed is supported; a missing
+   * `speedRange` does not imply the opposite.
+   */
+  supportsSpeed?: boolean;
 }
 
 /**
